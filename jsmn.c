@@ -360,6 +360,7 @@ int jsmn_explore(const char* json,
         }
         else i++;
     }
+    if (i>=jstok_dim) *result = NULL;
     free(jstokens);
     va_end(args);
     return 0;
@@ -425,6 +426,7 @@ int jsmn_parse_explore(const char *json, char **result, int len, ...) {
         }
         else i++;
     }
+    if (i>=jstok_dim) *result = NULL;
     free(jstokens);
     va_end(args);
     return 0;
