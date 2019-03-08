@@ -312,3 +312,120 @@ void jsmn_init(jsmn_parser *parser) {
 	parser->toksuper = -1;
 }
 
+
+int jsmn_explore(const char* json,
+                 char **result,
+                 jsmntok_t *jstokens,
+                 int jstok_dim,
+                 int len, ...) {
+    va_list args;
+    va_start(args, len);
+    int i=0, j=0, tok_len;
+    char *item = NULL;
+    char *current_argument;
+
+    current_argument = va_arg(args, char*);
+    while ((i<jstok_dim) && (j<len)) {
+        if (jstokens[i].size>0) {
+            tok_len = jstokens[i].end-jstokens[i].start;
+            item = (char *) malloc((tok_len+1)*sizeof(char));
+            if (item == NULL) {
+                free(jstokens);
+                return 4;
+            }
+            strncpy(item, json+jstokens[i].start, tok_len);
+            item[tok_len] = '\0';
+
+            if (!strcmp(item, current_argument)) {
+                tok_len = jstokens[i+1].end-jstokens[i+1].start;
+                *result = (char *) malloc((tok_len+1)*sizeof(char));
+                if (*result == NULL) {
+                    free(item);
+                    free(jstokens);
+                    return 5;
+                }
+                strncpy(*result, json+jstokens[i+1].start, tok_len);
+                (*result)[tok_len] = '\0';
+                j++;
+                if (j<len) {
+                    current_argument = va_arg(args, char*);
+                    i += 2;
+                    free(*result);
+                }
+                free(item);
+            }
+            else {
+                i += jstokens[i].size;
+            }
+        }
+        else i++;
+    }
+    free(jstokens);
+    va_end(args);
+    return 0;
+}
+
+int jsmn_parse_explore(const char *json, char **result, int len, ...) {
+    jsmn_parser parser;
+    jsmntok_t *jstokens;
+    int jstok_dim;
+
+    va_list args;
+    va_start(args, len);
+    int i=0, j=0, tok_len;
+    char *item = NULL;
+    char *current_argument;
+
+    jsmn_init(&parser);
+    jstok_dim = jsmn_parse(&parser, json, strlen(json), NULL, 0);
+    if (jstok_dim<0) return 1;
+
+    jstokens = (jsmntok_t *) malloc(jstok_dim*sizeof(jsmntok_t));
+    if (jstokens == NULL) return 2;
+
+    jsmn_init(&parser);
+    if (jsmn_parse(&parser, json, strlen(json), jstokens, jstok_dim)<0) {
+        free(jstokens);
+        return 3;
+    }
+
+    current_argument = va_arg(args, char*);
+    while ((i<jstok_dim) && (j<len)) {
+        if (jstokens[i].size>0) {
+            tok_len = jstokens[i].end-jstokens[i].start;
+            item = (char *) malloc((tok_len+1)*sizeof(char));
+            if (item == NULL) {
+                free(jstokens);
+                return 4;
+            }
+            strncpy(item, json+jstokens[i].start, tok_len);
+            item[tok_len] = '\0';
+
+            if (!strcmp(item, current_argument)) {
+                tok_len = jstokens[i+1].end-jstokens[i+1].start;
+                *result = (char *) malloc((tok_len+1)*sizeof(char));
+                if (*result == NULL) {
+                    free(item);
+                    free(jstokens);
+                    return 5;
+                }
+                strncpy(*result, json+jstokens[i+1].start, tok_len);
+                (*result)[tok_len] = '\0';
+                j++;
+                if (j<len) {
+                    current_argument = va_arg(args, char*);
+                    i += 2;
+                    free(*result);
+                }
+                free(item);
+            }
+            else {
+                i += jstokens[i].size;
+            }
+        }
+        else i++;
+    }
+    free(jstokens);
+    va_end(args);
+    return 0;
+}

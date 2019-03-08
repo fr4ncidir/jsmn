@@ -3,6 +3,11 @@
 
 #include <stddef.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -68,6 +73,15 @@ void jsmn_init(jsmn_parser *parser);
  */
 int jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
 		jsmntok_t *tokens, unsigned int num_tokens);
+
+
+int jsmn_explore(const char* json,
+                 char **result,
+                 jsmntok_t *jstokens,
+                 int jstok_dim,
+                 int len, ...);
+
+int jsmn_parse_explore(const char *json, char **result, int len, ...);
 
 #ifdef __cplusplus
 }
