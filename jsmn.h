@@ -74,12 +74,29 @@ int jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
 		jsmntok_t *tokens, unsigned int num_tokens);
 
 
+/**
+ * Given a json string, we look for a path within it in variadic arguments.
+ * The content of the path is stored in the string pointed to by 'result',
+ * while the parsed json is given through jstokens array and jstok_dim.
+ * 'len' is the number of variadic arguments.
+ *
+ * Will return 0 upon success, storing a string in 'result', in case of correct path,
+ * or NULL, in case of 'path not found'.
+ */
 int jsmn_explore(const char* json,
                  char **result,
                  jsmntok_t *jstokens,
                  int jstok_dim,
                  int len, ...);
 
+/**
+ * Given a json string, we look for a path within it in variadic arguments.
+ * The content of the path is stored in the string pointed to by 'result'.
+ * The json string is parsed on-the-go.
+ *
+ * Will return 0 upon success, storing a string in 'result', in case of correct path,
+ * or NULL, in case of 'path not found'.
+ */
 int jsmn_parse_explore(const char *json, char **result, int len, ...);
 
 #ifdef __cplusplus
