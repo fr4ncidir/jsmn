@@ -73,6 +73,7 @@ void jsmn_init(jsmn_parser *parser);
 int jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
 		jsmntok_t *tokens, unsigned int num_tokens);
 
+int jsmn_getTokenLen(const char* json, int startIndex, int len);
 
 /**
  * Given a json string, we look for a path within it in variadic arguments.

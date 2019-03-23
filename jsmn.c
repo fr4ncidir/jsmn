@@ -313,65 +313,96 @@ void jsmn_init(jsmn_parser *parser) {
 }
 
 /**
+ * From a json text, a start index and the text length, returns an integer as 
+ * the number of tokens necessary for this text to be parsed with jsmn.
+ */
+int jsmn_getTokenLen(const char* json, int startIndex, int len) {
+    jsmn_parser _parser;
+    jsmntok_t *_jstokens;
+    int _jstok_dim;
+    
+    jsmn_init(&_parser);
+    _jstok_dim = jsmn_parse(&_parser, json+startIndex, len, NULL, 0);
+    return _jstok_dim;
+}
+
+/**
+ * See jsmn_explore, jsmn_parse_explore.
+ */
+int jsmn_variadic_explore(const char* json,
+                          char **result,
+                          jsmntok_t *jstokens,
+                          int jstok_dim,
+                          int len,
+                          va_list args) {
+    int i, j=1, tok_len, game_over=jstok_dim, i_result, error=0;
+    char *t_content, *current_parameter;
+    
+    current_parameter = va_arg(args, char*);
+    for (i=0; (i<jstok_dim) && (game_over>0); i++) {
+        if (j<len) {
+            if ((jstokens[i].type == JSMN_STRING) && (jstokens[i+1].type == JSMN_OBJECT)) {
+                tok_len = jstokens[i].end-jstokens[i].start;
+                t_content = strndup(&(json[jstokens[i].start]), tok_len);
+                if (t_content == NULL) {
+                    error = -2;
+                    break;
+                }
+                
+                if (!strcmp(t_content, current_parameter)) {
+                    j++;
+                    current_parameter = va_arg(args, char*);
+                    game_over = jsmn_getTokenLen(json, jstokens[i+1].start, jstokens[i+1].end-jstokens[i+1].start);
+                }
+            }
+        }
+        else {
+            if (jstokens[i].type == JSMN_STRING) {
+                tok_len = jstokens[i].end-jstokens[i].start;
+                t_content = strndup(&(json[jstokens[i].start]), tok_len);
+                if (t_content == NULL) {
+                    error = -3;
+                    break;
+                }
+                
+                if (!strcmp(t_content, current_parameter)) {
+                    i_result = i+1;
+                    tok_len = jstokens[i+1].end-jstokens[i_result].start;
+                    *result = strndup(&(json[jstokens[i_result].start]), tok_len);
+                    break;
+                }
+            }
+        }
+        game_over--;
+    }
+    if ((i==jstok_dim) || (!game_over) || (error)) {
+        i_result = -1+error;
+        *result = NULL;
+    }
+    return i_result;
+}
+
+/**
  * Given a json string, we look for a path within it in variadic arguments.
  * The content of the path is stored in the string pointed to by 'result',
  * while the parsed json is given through jstokens array and jstok_dim.
  * 'len' is the number of variadic arguments.
  *
- * Will return 0 upon success, storing a string in 'result', in case of correct path,
- * or NULL, in case of 'path not found'.
+ * Will return the token index upon success, storing a string in 'result', in case of correct path;
+ * or -1 and NULL, in case of 'path not found'.
  */
 int jsmn_explore(const char* json,
                  char **result,
                  jsmntok_t *jstokens,
                  int jstok_dim,
                  int len, ...) {
+    int r;
     va_list args;
+    
     va_start(args, len);
-    int i=0, j=0, tok_len;
-    char *item = NULL;
-    char *current_argument;
-
-    current_argument = va_arg(args, char*);
-    while ((i<jstok_dim) && (j<len)) {
-        if (jstokens[i].size>0) {
-            tok_len = jstokens[i].end-jstokens[i].start;
-            item = (char *) malloc((tok_len+1)*sizeof(char));
-            if (item == NULL) {
-                free(jstokens);
-                return 4;
-            }
-            strncpy(item, json+jstokens[i].start, tok_len);
-            item[tok_len] = '\0';
-
-            if (!strcmp(item, current_argument)) {
-                tok_len = jstokens[i+1].end-jstokens[i+1].start;
-                *result = (char *) malloc((tok_len+1)*sizeof(char));
-                if (*result == NULL) {
-                    free(item);
-                    free(jstokens);
-                    return 5;
-                }
-                strncpy(*result, json+jstokens[i+1].start, tok_len);
-                (*result)[tok_len] = '\0';
-                j++;
-                if (j<len) {
-                    current_argument = va_arg(args, char*);
-                    i += 2;
-                    free(*result);
-                }
-                free(item);
-            }
-            else {
-                i += jstokens[i].size;
-            }
-        }
-        else i++;
-    }
-    if (i>=jstok_dim) *result = NULL;
-    free(jstokens);
+    r = jsmn_variadic_explore(json, result, jstokens, jstok_dim, len, args);
     va_end(args);
-    return 0;
+    return r;
 }
 
 /**
@@ -379,71 +410,31 @@ int jsmn_explore(const char* json,
  * The content of the path is stored in the string pointed to by 'result'.
  * The json string is parsed on-the-go.
  *
- * Will return 0 upon success, storing a string in 'result', in case of correct path,
- * or NULL, in case of 'path not found'.
+ * Will return the token number upon success, storing a string in 'result', in case of correct path.
+ * Or NULL and a negative integer, in case of error or 'path not found'.
  */
 int jsmn_parse_explore(const char *json, char **result, int len, ...) {
     jsmn_parser parser;
     jsmntok_t *jstokens;
-    int jstok_dim;
-
+    int jstok_dim, json_len, r;
     va_list args;
+    
     va_start(args, len);
-    int i=0, j=0, tok_len;
-    char *item = NULL;
-    char *current_argument;
-
-    jsmn_init(&parser);
-    jstok_dim = jsmn_parse(&parser, json, strlen(json), NULL, 0);
-    if (jstok_dim<0) return 1;
+    *result = NULL;
+    json_len = strlen(json);
+    jstok_dim = jsmn_getTokenLen(json, 0, json_len);
+    if (jstok_dim<0) return -1;
 
     jstokens = (jsmntok_t *) malloc(jstok_dim*sizeof(jsmntok_t));
-    if (jstokens == NULL) return 2;
+    if (jstokens == NULL) return -2;
 
     jsmn_init(&parser);
-    if (jsmn_parse(&parser, json, strlen(json), jstokens, jstok_dim)<0) {
+    if (jsmn_parse(&parser, json, json_len, jstokens, jstok_dim)<0) {
         free(jstokens);
-        return 3;
+        return -3;
     }
 
-    current_argument = va_arg(args, char*);
-    while ((i<jstok_dim) && (j<len)) {
-        if (jstokens[i].size>0) {
-            tok_len = jstokens[i].end-jstokens[i].start;
-            item = (char *) malloc((tok_len+1)*sizeof(char));
-            if (item == NULL) {
-                free(jstokens);
-                return 4;
-            }
-            strncpy(item, json+jstokens[i].start, tok_len);
-            item[tok_len] = '\0';
-
-            if (!strcmp(item, current_argument)) {
-                tok_len = jstokens[i+1].end-jstokens[i+1].start;
-                *result = (char *) malloc((tok_len+1)*sizeof(char));
-                if (*result == NULL) {
-                    free(item);
-                    free(jstokens);
-                    return 5;
-                }
-                strncpy(*result, json+jstokens[i+1].start, tok_len);
-                (*result)[tok_len] = '\0';
-                j++;
-                if (j<len) {
-                    current_argument = va_arg(args, char*);
-                    i += 2;
-                    free(*result);
-                }
-                free(item);
-            }
-            else {
-                i += jstokens[i].size;
-            }
-        }
-        else i++;
-    }
-    if (i>=jstok_dim) *result = NULL;
-    free(jstokens);
+    r = jsmn_variadic_explore(json, result, jstokens, jstok_dim, len, args);
     va_end(args);
-    return 0;
+    return r;
 }
