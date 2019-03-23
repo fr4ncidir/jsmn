@@ -436,5 +436,6 @@ int jsmn_parse_explore(const char *json, char **result, int len, ...) {
 
     r = jsmn_variadic_explore(json, result, jstokens, jstok_dim, len, args);
     va_end(args);
+    free(jstokens);
     return r;
 }
