@@ -313,18 +313,28 @@ void jsmn_init(jsmn_parser *parser) {
 }
 
 /**
- * From a json text, a start index and the text length, returns an integer as 
+ * From a json text, a start index and the text length, returns an integer as
  * the number of tokens necessary for this text to be parsed with jsmn.
  */
 int jsmn_getTokenLen(const char* json, int startIndex, int len) {
     jsmn_parser _parser;
-    jsmntok_t *_jstokens;
-    int _jstok_dim;
-    
+
     jsmn_init(&_parser);
-    _jstok_dim = jsmn_parse(&_parser, json+startIndex, len, NULL, 0);
-    return _jstok_dim;
+    return jsmn_parse(&_parser, json+startIndex, len, NULL, 0);
 }
+
+#ifdef WIN32
+char * _strndup(const char *origin, int n) {
+    char *destination;
+
+    destination = (char *) malloc((n+1)*sizeof(char));
+    if (destination == NULL) return NULL;
+
+    strncpy(destination, origin, n);
+    destination[n] = '\0';
+    return destination;
+}
+#endif // WIN32
 
 /**
  * See jsmn_explore, jsmn_parse_explore.
@@ -337,7 +347,7 @@ int jsmn_variadic_explore(const char* json,
                           va_list args) {
     int i, j=1, tok_len, game_over=jstok_dim, i_result, error=0;
     char *t_content, *current_parameter;
-    
+
     current_parameter = va_arg(args, char*);
     for (i=0; (i<jstok_dim) && (game_over>0); i++) {
         if (j<len) {
@@ -348,7 +358,7 @@ int jsmn_variadic_explore(const char* json,
                     error = -2;
                     break;
                 }
-                
+
                 if (!strcmp(t_content, current_parameter)) {
                     j++;
                     current_parameter = va_arg(args, char*);
@@ -364,7 +374,7 @@ int jsmn_variadic_explore(const char* json,
                     error = -3;
                     break;
                 }
-                
+
                 if (!strcmp(t_content, current_parameter)) {
                     i_result = i+1;
                     tok_len = jstokens[i+1].end-jstokens[i_result].start;
@@ -398,7 +408,7 @@ int jsmn_explore(const char* json,
                  int len, ...) {
     int r;
     va_list args;
-    
+
     va_start(args, len);
     r = jsmn_variadic_explore(json, result, jstokens, jstok_dim, len, args);
     va_end(args);
@@ -418,7 +428,7 @@ int jsmn_parse_explore(const char *json, char **result, int len, ...) {
     jsmntok_t *jstokens;
     int jstok_dim, json_len, r;
     va_list args;
-    
+
     va_start(args, len);
     *result = NULL;
     json_len = strlen(json);

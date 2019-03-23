@@ -100,6 +100,11 @@ int jsmn_explore(const char* json,
  */
 int jsmn_parse_explore(const char *json, char **result, int len, ...);
 
+#ifdef WIN32
+#define strndup(origin, n)      _strndup(origin, n)
+char * _strndup(const char *origin, int n);
+#endif // WIN32
+
 #ifdef __cplusplus
 }
 #endif
